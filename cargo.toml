@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/poker-server",
+    "crates/poker-client",
+    "crates/poker-shared"
+]
+
+resolver = "3"

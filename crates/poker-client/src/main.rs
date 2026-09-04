@@ -1,0 +1,66 @@
+use clap::Parser;
+use tui::start_tui;
+use url::Url;
+use worker::spawn_worker;
+
+mod state;
+mod tui;
+mod worker;
+
+#[derive(Parser)]
+#[command(version = "0.1.0")]
+#[command(about = "Client for Pokerkees")]
+struct Cli {
+    #[arg(short, long, default_value_t = String::new())]
+    #[arg(help = "The url of the Pokerkees server, include port is necessary")]
+    url: String,
+
+    #[arg(short, long, default_value_t = String::new())]
+    #[arg(help = "The name to use for your Pokerkees user")]
+    name: String,
+}
+
+fn main() {
+    // init logging
+    // We will stop logging as soon as the TUI is up and running
+    colog::init();
+    log::info!("Booting Pokerkees client");
+    // Start by reading cli stuff
+    let cli = Cli::parse();
+    if !cli.name.is_empty() {
+        log::info!("Using name from cli arguments");
+    }
+    let mut url: Option<Url> = None;
+    if !cli.url.is_empty() {
+        if let Ok(parsed_url) = Url::parse(&cli.url) {
+            url = Some(parsed_url);
+            log::info!("Using url from cli arguments");
+        } else {
+            log::error!("Passed url is not valid. Please check.");
+            return;
+        }
+    }
+
+    let (s, r, handle) = spawn_worker();
+
+    let state = state::init_state(cli.name, url, s, r);
+
+    let tui_exit = start_tui(state);
+
+    match tui_exit {
+        Ok(_) => log::info!("Tui Exited normally"),
+        Err(err) => {
+            log::error!("{err}");
+            log::error!("Tui errored. Exiting.");
+        }
+    }
+
+    // Note the worker stops in two cases
+    // - when the tui exits and the event sender gets dropped
+    // - when the worker times out (which should not happen in working tui)
+    log::info!("Waiting for worker to finish");
+    match handle.join() {
+        Ok(_) => log::info!("Worker finished"),
+        Err(e) => log::error!("Error while closing worker: {e:?}"),
+    }
+}

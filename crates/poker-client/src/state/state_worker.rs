@@ -19,15 +19,16 @@ pub fn check_worker_logic(state: &mut AppState) {
     // only check if server is NOT active
     if !state.worker.worker_active {
         // server connection check
-        // We only check if we actually have a url
-        if let Some(server_url) = state.server_url.as_ref()
-            && state.time_last_server_check.elapsed() >= HEALTH_CHECK_MILLI
-        {
+        // We always check! Also if we do not have a url
+        // so this event ALSO functions as a heartbeat for the worker
+        if state.time_last_server_check.elapsed() >= HEALTH_CHECK_MILLI {
             // Create a worker check server connection event
             state
                 .worker
                 .tasks
-                .push_back(WorkerRequest::CheckServerConnection(server_url.clone()));
+                .push_back(WorkerRequest::CheckServerConnection(
+                    state.server_url.clone(),
+                ));
         }
     }
 

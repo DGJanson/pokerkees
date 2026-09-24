@@ -16,7 +16,7 @@ use url::Url;
 #[derive(Debug, Clone)]
 pub enum WorkerRequest {
     /// Check connection with server, using String parm as url
-    CheckServerConnection(Url),
+    CheckServerConnection(Option<Url>),
 }
 
 // Worker -> UI
@@ -83,7 +83,10 @@ fn handle_request(request: WorkerRequest, client: &Client) -> WorkerEvent {
     }
 }
 
-fn check_server_connection(url: Url, client: &Client) -> WorkerEvent {
+fn check_server_connection(url_opt: Option<Url>, client: &Client) -> WorkerEvent {
+    let Some(url) = url_opt else {
+        return WorkerEvent::ServerHealth { ok: false };
+    };
     let check_url = match url.join("check") {
         Ok(u) => u,
         Err(_) => {

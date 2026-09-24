@@ -16,6 +16,8 @@ use crate::{
     worker::WorkerRequest,
 };
 
+mod inputhandler;
+mod keyhandler;
 mod layoututils;
 mod tuidraw;
 
@@ -61,11 +63,13 @@ where
     let timeout = Duration::from_millis(100);
     // if we have a server url, we would like to perform
     // a connection check right away
-    if let Some(server_url) = state.server_url.as_ref() {
+    if state.server_url.is_some() {
         state
             .worker
             .tasks
-            .push_back(WorkerRequest::CheckServerConnection(server_url.clone()));
+            .push_back(WorkerRequest::CheckServerConnection(
+                state.server_url.clone(),
+            ));
     }
 
     loop {
@@ -117,5 +121,13 @@ fn draw_pokerkees<B: Backend>(terminal: &mut Terminal<B>, state: &mut AppState) 
 }
 
 fn handle_key_event(key: KeyEvent, state: &mut AppState) {
-    return;
+    // For readability reasons we move the call to another mod
+
+    // Do some simple checks
+    // Ignore if release to prevent double events
+    // on some systems
+    if key.is_release() {
+        return;
+    }
+    keyhandler::handle_key(key, state);
 }

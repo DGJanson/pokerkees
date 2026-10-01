@@ -2,7 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 // This mod takes care of all input in the app
 use url::Url;
 
-use crate::state::{AppState, InputType, UIScreenMode};
+use crate::{
+    state::{AppState, InputType, UIScreenMode},
+    worker::WorkerRequest,
+};
 
 /// Generic function for activating input
 /// Sets basic settings for input, like UIState
@@ -21,6 +24,9 @@ pub fn set_input(state: &mut AppState, input_type: InputType) {
         }
         InputType::UserName => {
             state.ui_state.input_value = state.user_name.clone();
+        }
+        InputType::NewSession => {
+            state.ui_state.input_value = String::new();
         }
     }
     state.ui_state.input_type = input_type;
@@ -41,8 +47,25 @@ pub fn handle_confirm_input(state: &mut AppState) {
                 }
             };
             state.server_url = new_server_url;
+            // Send a check connection event right away
+            state
+                .worker
+                .tasks
+                .push_back(WorkerRequest::CheckServerConnection(
+                    state.server_url.clone(),
+                ));
         }
         InputType::UserName => state.user_name = state.ui_state.input_value.clone(),
+        InputType::NewSession => {
+            // In this case we only send the create request to server
+            // After this succeeds, we activate the session in the app
+            if let Some(url) = &state.server_url {
+                state.worker.tasks.push_back(WorkerRequest::CreateSession(
+                    url.clone(),
+                    state.ui_state.input_value.clone(),
+                ));
+            }
+        }
     }
     // Reset screen state
     reset_input(state);

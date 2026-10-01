@@ -55,6 +55,9 @@ pub fn check_worker_logic(state: &mut AppState) {
     }
 }
 
+/// This handles responses from the worker
+/// Adjust the state as needed, based on the response
+/// from the worker
 fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
     match event {
         WorkerEvent::ServerHealth { ok } => {
@@ -64,6 +67,16 @@ fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
         }
         WorkerEvent::Error(error_msg) => {
             state.worker_error = Some(error_msg.clone());
+        }
+        WorkerEvent::Sessions { sessions } => {
+            state.available_sessions = sessions;
+        }
+        WorkerEvent::CreatedSession(session) => {
+            state.selected_session = session;
+        }
+        WorkerEvent::DeletedSession => {
+            // On successful delete, simply clear the selected session
+            state.selected_session.clear();
         }
     }
 }

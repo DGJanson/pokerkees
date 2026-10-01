@@ -12,8 +12,11 @@ use ratatui::{
 
 use crate::state::{AppState, UIScreenMode};
 
-use super::layoututils::{
-    get_center_rect, get_inner_rect, get_inner_rect_pad, horizontal_left_divide_by_cells,
+use super::{
+    layoututils::{
+        get_center_rect, get_inner_rect, get_inner_rect_pad, horizontal_left_divide_by_cells,
+    },
+    screens::session::draw_session_info,
 };
 
 pub fn draw_ui(frame: &mut Frame, state: &mut AppState) {
@@ -25,7 +28,7 @@ pub fn draw_ui(frame: &mut Frame, state: &mut AppState) {
     draw_left_box(frame, state, left_box);
     draw_right_box(frame, state, right_box);
 
-    // Of there is an error, we ALWAYS draw it at top of rightbox
+    // If there is an error, we ALWAYS draw it at top of rightbox
     if state.app_error.is_some() {
         draw_error(frame, state.app_error.as_deref(), right_box);
     }
@@ -91,7 +94,9 @@ fn draw_right_box(frame: &mut Frame, state: &mut AppState, outer_area: Rect) {
     // match on state right away
     match state.ui_state.screen_mode {
         UIScreenMode::Main => {}
-        UIScreenMode::Session => {}
+        UIScreenMode::Session => {
+            draw_session_info(frame, state, outer_area);
+        }
         UIScreenMode::Input => {
             draw_input_box(frame, state, outer_area);
         }
@@ -210,5 +215,11 @@ fn build_session_lines(state: &AppState) -> Vec<Line> {
     let mut lines = header_lines(state, true);
     lines.push(Line::from("Session:").style(Style::default().fg(Color::Yellow)));
     lines.push(Line::from(state.selected_session.as_str()));
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![
+        Span::from("Use "),
+        Span::styled("s ", Style::default().fg(Color::Blue)),
+        Span::from("to open the session menu."),
+    ]));
     lines
 }

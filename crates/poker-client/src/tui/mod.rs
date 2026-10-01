@@ -1,7 +1,7 @@
 use std::{error::Error, io, time::Duration};
 
 use crossterm::{
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    event::{self, Event, KeyEvent},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
@@ -19,6 +19,7 @@ use crate::{
 mod inputhandler;
 mod keyhandler;
 mod layoututils;
+mod screens;
 mod tuidraw;
 
 /// This will setup the terminal so we can start our TUI app
@@ -41,6 +42,7 @@ pub fn start_tui(state: AppState) -> Result<(), Box<dyn Error>> {
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     terminal.show_cursor()?;
 
+    // Log propagated errors, if appropriate
     if finished.is_ok() {
         log::info!("Tui closed");
     } else if let Err(err) = finished {
@@ -79,21 +81,13 @@ where
         }
 
         // Always start with a draw
-        draw_pokerkees(terminal, &mut state);
+        // If draw fails, we likely have serious error
+        // So propagate, leading to exit of app
+        draw_pokerkees(terminal, &mut state)?;
 
         // Listen for user input
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-                if key.is_release() {
-                    // Skip release (only press events)
-                    // to prevent double events on windows
-                    continue;
-                }
-                // Generic exit code
-                if key.modifiers == KeyModifiers::CONTROL && key.code == KeyCode::Char('q') {
-                    state.should_exit = true;
-                    continue;
-                }
                 // handle_key_press
                 handle_key_event(key, &mut state);
             }
@@ -104,7 +98,10 @@ where
     }
 }
 
-fn draw_pokerkees<B: Backend>(terminal: &mut Terminal<B>, state: &mut AppState) {
+fn draw_pokerkees<B: Backend>(terminal: &mut Terminal<B>, state: &mut AppState) -> io::Result<()>
+where
+    io::Error: From<B::Error>,
+{
     // TODO, handle draw errors
     terminal.draw(|frame| {
         if frame.area().width < 100 || frame.area().height < 30 {
@@ -117,7 +114,8 @@ fn draw_pokerkees<B: Backend>(terminal: &mut Terminal<B>, state: &mut AppState) 
         }
         // Offload the real drawing to dedicated module
         tuidraw::draw_ui(frame, state);
-    });
+    })?;
+    Ok(())
 }
 
 fn handle_key_event(key: KeyEvent, state: &mut AppState) {

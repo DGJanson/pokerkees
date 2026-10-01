@@ -24,6 +24,7 @@ pub struct AppState {
 
     // session
     pub selected_session: String,
+    pub available_sessions: Vec<String>,
 
     // item
     pub selected_item: usize,
@@ -50,6 +51,10 @@ pub struct UIState {
     pub screen_mode: UIScreenMode,
     pub input_type: InputType,
     pub input_value: String,
+    // Used for selecting from lists
+    // eg. sessions, items, etc
+    // Note that we reuse this for multiple screens!
+    pub selected_index: usize,
 }
 
 pub enum UIScreenMode {
@@ -71,6 +76,7 @@ pub enum InputType {
     None,
     Server,
     UserName,
+    NewSession,
 }
 
 impl fmt::Display for InputType {
@@ -79,6 +85,7 @@ impl fmt::Display for InputType {
             Self::None => write!(f, "<None>"),
             Self::Server => write!(f, "Server Url"),
             Self::UserName => write!(f, "User name"),
+            Self::NewSession => write!(f, "Session name"),
         }
     }
 }
@@ -100,6 +107,7 @@ pub fn init_state(
         screen_mode: UIScreenMode::Main,
         input_type: InputType::None,
         input_value: String::new(),
+        selected_index: 0,
     };
 
     let worker_state = WorkerState {
@@ -115,6 +123,7 @@ pub fn init_state(
         server_connected: false,
         time_last_server_check: Instant::now(),
         selected_session: String::new(),
+        available_sessions: Vec::new(),
         selected_item: 0,
         should_exit: false,
         ui_state,
@@ -122,4 +131,10 @@ pub fn init_state(
         worker_error: None,
         app_error: None,
     }
+}
+
+// !! -- State change functions -- !!
+pub fn reset_sessions(state: &mut AppState) {
+    state.available_sessions.clear();
+    state.ui_state.selected_index = 0;
 }

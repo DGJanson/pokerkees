@@ -1754,6 +1754,7 @@ dependencies = [
  "poker-shared",
  "ratatui",
  "reqwest",
+ "serde",
  "serde_json",
  "url",
 ]
@@ -2105,6 +2106,8 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "rustls-platform-verifier",
+ "serde",
+ "serde_json",
  "sync_wrapper",
  "tokio",
  "tokio-rustls",

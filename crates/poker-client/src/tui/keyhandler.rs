@@ -1,6 +1,9 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::state::{AppState, InputType, UIScreenMode};
+use crate::{
+    state::{AppState, InputType, UIScreenMode, reset_sessions},
+    worker::WorkerRequest,
+};
 
 use super::inputhandler::{handle_confirm_input, input_handle_key, reset_input, set_input};
 
@@ -29,12 +32,47 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
     // get longer than few lines
     match state.ui_state.screen_mode {
         UIScreenMode::Main => match key.code {
-            KeyCode::Char('s') => state.ui_state.screen_mode = UIScreenMode::Session,
+            KeyCode::Char('s') => {
+                state.ui_state.screen_mode = UIScreenMode::Session;
+                reset_sessions(state);
+                // If we have a server url we can get sessions
+                if let Some(url) = &state.server_url {
+                    state
+                        .worker
+                        .tasks
+                        .push_back(WorkerRequest::GetAvailableSessions(url.clone()));
+                }
+            }
             KeyCode::Char('U') => set_input(state, InputType::Server),
             KeyCode::Char('N') => set_input(state, InputType::UserName),
             _ => {}
         },
-        UIScreenMode::Session => {}
+        UIScreenMode::Session => match key.code {
+            KeyCode::Esc => state.ui_state.screen_mode = UIScreenMode::Main,
+            KeyCode::Char('j') => {
+                if state.ui_state.selected_index + 1 < state.available_sessions.len() {
+                    state.ui_state.selected_index += 1;
+                }
+            }
+            KeyCode::Char('k') => {
+                if state.ui_state.selected_index > 0 {
+                    state.ui_state.selected_index -= 1;
+                }
+            }
+            KeyCode::Char('C') => {
+                set_input(state, InputType::NewSession);
+            }
+            KeyCode::Char('D') => {
+                if let Some(url) = &state.server_url {
+                    state.worker.tasks.push_back(WorkerRequest::DeleteSession(
+                        url.clone(),
+                        state.selected_session.clone(),
+                    ));
+                }
+                state.ui_state.screen_mode = UIScreenMode::Main;
+            }
+            _ => {}
+        },
         UIScreenMode::Input => match key.code {
             KeyCode::Esc => {
                 // This will also reset the screen_mode

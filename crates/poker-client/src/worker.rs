@@ -6,14 +6,13 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+use handlers::items::{ItemInfo as ItemsListItem, parse_get_item_info, parse_get_items};
 use handlers::sessions::parse_get_sessions;
+use poker_shared::PokerItem;
 use reqwest::blocking::Client;
 use url::Url;
 
 mod handlers;
-
-// TODO, clean this
-// this is raw LLM output
 
 // UI -> Worker
 // Note it is best to clone parameters to events,
@@ -25,6 +24,14 @@ pub enum WorkerRequest {
     GetAvailableSessions(Url),
     CreateSession(Url, String),
     DeleteSession(Url, String),
+
+    // Items
+    GetItems(Url, String),
+    CreateItem(Url, String, usize, Option<String>),
+    GetItemInfo(Url, String, usize),
+    RevealItem(Url, String, usize),
+    FinishItem(Url, String, usize),
+    VoteForItem(Url, String, usize, String, usize),
 }
 
 // Worker -> UI
@@ -37,6 +44,18 @@ pub enum WorkerEvent {
     CreatedSession(String),
     // Deleted a session successfully
     DeletedSession,
+
+    // Items list for a session
+    Items { items: Vec<ItemsListItem> },
+    // Detailed info of a single item
+    ItemInfo { item: PokerItem },
+    // Item created
+    CreatedItem { item_id: usize },
+    // Successful reveal/finish/vote acks
+    ItemRevealed,
+    ItemFinished,
+    ItemVoted,
+
     // In case of any error, simply return
     Error(String),
 }
@@ -104,6 +123,28 @@ fn handle_request(request: WorkerRequest, client: &Client) -> WorkerEvent {
         }
         WorkerRequest::DeleteSession(url, session_name) => {
             delete_session(url, session_name.as_str(), client)
+        }
+
+        // Items
+        WorkerRequest::GetItems(url, session) => get_items(url, session.as_str(), client),
+        WorkerRequest::CreateItem(url, session, item_id, item_title) => create_item(
+            url,
+            session.as_str(),
+            item_id,
+            item_title.as_deref(),
+            client,
+        ),
+        WorkerRequest::GetItemInfo(url, session, item_id) => {
+            get_item_info(url, session.as_str(), item_id, client)
+        }
+        WorkerRequest::RevealItem(url, session, item_id) => {
+            reveal_item(url, session.as_str(), item_id, client)
+        }
+        WorkerRequest::FinishItem(url, session, item_id) => {
+            finish_item(url, session.as_str(), item_id, client)
+        }
+        WorkerRequest::VoteForItem(url, session, item_id, user, vote) => {
+            vote_for_item(url, session.as_str(), item_id, user.as_str(), vote, client)
         }
     }
 }
@@ -204,7 +245,7 @@ fn create_session(url: Url, session_name: &str, client: &Client) -> WorkerEvent 
                 WorkerEvent::Error(msg)
             }
         }
-        Err(e) => WorkerEvent::Error(String::from(
+        Err(_) => WorkerEvent::Error(String::from(
             "Error creating session. Could not reach server",
         )),
     }
@@ -241,8 +282,248 @@ fn delete_session(url: Url, session_name: &str, client: &Client) -> WorkerEvent 
                 WorkerEvent::Error(msg)
             }
         }
-        Err(e) => WorkerEvent::Error(String::from(
+        Err(_) => WorkerEvent::Error(String::from(
             "Error deleting session. Could not reach server",
+        )),
+    }
+}
+
+fn get_items(url: Url, session: &str, client: &Client) -> WorkerEvent {
+    let items_url = match url.join("items") {
+        Ok(u) => u,
+        Err(_) => {
+            return WorkerEvent::Error(String::from("Error polling for items. Could not set url"));
+        }
+    };
+
+    match client.get(items_url).query(&[("session", session)]).send() {
+        Ok(resp) => {
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let msg = if status == reqwest::StatusCode::NOT_FOUND {
+                    format!("Error polling for items. Session '{session}' not found")
+                } else {
+                    format!("Error polling for items. Server returned status {status}")
+                };
+                return WorkerEvent::Error(msg);
+            }
+
+            match resp.text() {
+                Ok(body) => parse_get_items(body.as_str()),
+                Err(_) => WorkerEvent::Error(
+                    "Error polling for items. Could not read server response".to_string(),
+                ),
+            }
+        }
+        Err(_) => WorkerEvent::Error(String::from(
+            "Error polling for items. Could not get items list",
+        )),
+    }
+}
+
+fn create_item(
+    url: Url,
+    session: &str,
+    item_id: usize,
+    item_title: Option<&str>,
+    client: &Client,
+) -> WorkerEvent {
+    let items_url = match url.join("items") {
+        Ok(u) => u,
+        Err(_) => {
+            return WorkerEvent::Error(String::from("Error creating item. Could not set url"));
+        }
+    };
+
+    #[derive(serde::Serialize)]
+    struct PostItem<'a> {
+        session: &'a str,
+        item_id: usize,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        item_title: Option<&'a str>,
+    }
+
+    let body = PostItem {
+        session,
+        item_id,
+        item_title,
+    };
+
+    match client.post(items_url).json(&body).send() {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                WorkerEvent::CreatedItem { item_id }
+            } else {
+                let msg = if status == reqwest::StatusCode::NOT_FOUND {
+                    format!("Error creating item. Session '{session}' not found")
+                } else if status == reqwest::StatusCode::CONFLICT {
+                    format!(
+                        "Error creating item. Item with id {item_id} already exists in session '{session}'"
+                    )
+                } else {
+                    format!("Error creating item. Server returned status {status}")
+                };
+                WorkerEvent::Error(msg)
+            }
+        }
+        Err(_) => WorkerEvent::Error(String::from("Error creating item. Could not reach server")),
+    }
+}
+
+fn get_item_info(url: Url, session: &str, item_id: usize, client: &Client) -> WorkerEvent {
+    let info_url = match url.join("item_info") {
+        Ok(u) => u,
+        Err(_) => {
+            return WorkerEvent::Error(String::from("Error fetching item info. Could not set url"));
+        }
+    };
+
+    match client
+        .get(info_url)
+        .query(&[("session", session), ("item_id", &item_id.to_string())])
+        .send()
+    {
+        Ok(resp) => {
+            let status = resp.status();
+            if !status.is_success() {
+                let msg = if status == reqwest::StatusCode::NOT_FOUND {
+                    String::from("Error fetching item info. Session or item not found")
+                } else {
+                    format!("Error fetching item info. Server returned status {status}")
+                };
+                return WorkerEvent::Error(msg);
+            }
+
+            match resp.text() {
+                Ok(body) => parse_get_item_info(body.as_str()),
+                Err(_) => WorkerEvent::Error(
+                    "Error fetching item info. Could not read server response".to_string(),
+                ),
+            }
+        }
+        Err(_) => WorkerEvent::Error(String::from(
+            "Error fetching item info. Could not reach server",
+        )),
+    }
+}
+
+fn reveal_item(url: Url, session: &str, item_id: usize, client: &Client) -> WorkerEvent {
+    let reveal_url = match url.join("reveal") {
+        Ok(u) => u,
+        Err(_) => {
+            return WorkerEvent::Error(String::from("Error revealing item. Could not set url"));
+        }
+    };
+
+    #[derive(serde::Serialize)]
+    struct ItemInfoQuery<'a> {
+        session: &'a str,
+        item_id: usize,
+    }
+
+    let body = ItemInfoQuery { session, item_id };
+
+    match client.post(reveal_url).json(&body).send() {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                WorkerEvent::ItemRevealed
+            } else {
+                let msg = if status == reqwest::StatusCode::NOT_FOUND {
+                    "Error revealing item. Session or item not found".to_string()
+                } else {
+                    format!("Error revealing item. Server returned status {status}")
+                };
+                WorkerEvent::Error(msg)
+            }
+        }
+        Err(_) => WorkerEvent::Error(String::from("Error revealing item. Could not reach server")),
+    }
+}
+
+fn finish_item(url: Url, session: &str, item_id: usize, client: &Client) -> WorkerEvent {
+    let finish_url = match url.join("finish") {
+        Ok(u) => u,
+        Err(_) => {
+            return WorkerEvent::Error(String::from("Error finishing item. Could not set url"));
+        }
+    };
+
+    #[derive(serde::Serialize)]
+    struct ItemInfoQuery<'a> {
+        session: &'a str,
+        item_id: usize,
+    }
+
+    let body = ItemInfoQuery { session, item_id };
+
+    match client.post(finish_url).json(&body).send() {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                WorkerEvent::ItemFinished
+            } else {
+                let msg = if status == reqwest::StatusCode::NOT_FOUND {
+                    "Error finishing item. Session or item not found".to_string()
+                } else {
+                    format!("Error finishing item. Server returned status {status}")
+                };
+                WorkerEvent::Error(msg)
+            }
+        }
+        Err(_) => WorkerEvent::Error(String::from("Error finishing item. Could not reach server")),
+    }
+}
+
+fn vote_for_item(
+    url: Url,
+    session: &str,
+    item_id: usize,
+    user: &str,
+    vote: usize,
+    client: &Client,
+) -> WorkerEvent {
+    let vote_url = match url.join("vote") {
+        Ok(u) => u,
+        Err(_) => {
+            return WorkerEvent::Error(String::from("Error voting for item. Could not set url"));
+        }
+    };
+
+    #[derive(serde::Serialize)]
+    struct VotePost<'a> {
+        session: &'a str,
+        item_id: usize,
+        user: &'a str,
+        vote: usize,
+    }
+
+    let body = VotePost {
+        session,
+        item_id,
+        user,
+        vote,
+    };
+
+    match client.post(vote_url).json(&body).send() {
+        Ok(resp) => {
+            let status = resp.status();
+            if status.is_success() {
+                WorkerEvent::ItemVoted
+            } else {
+                let msg = if status == reqwest::StatusCode::BAD_REQUEST {
+                    "Error voting for item. Invalid vote".to_string()
+                } else if status == reqwest::StatusCode::NOT_FOUND {
+                    "Error voting for item. Session or item not found".to_string()
+                } else {
+                    format!("Error voting for item. Server returned status {status}")
+                };
+                WorkerEvent::Error(msg)
+            }
+        }
+        Err(_) => WorkerEvent::Error(String::from(
+            "Error voting for item. Could not reach server",
         )),
     }
 }

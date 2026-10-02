@@ -78,5 +78,14 @@ fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
             // On successful delete, simply clear the selected session
             state.selected_session.clear();
         }
+
+        // New item-related events: no-ops for now (UI/state not wired yet)
+        WorkerEvent::Items { items: _ } => {}
+        WorkerEvent::ItemInfo { item: _ } => {}
+        WorkerEvent::CreatedItem { item_id: _ } => {}
+        WorkerEvent::ItemRevealed => {}
+        WorkerEvent::ItemFinished => {}
+        WorkerEvent::ItemVoted => {}
     }
 }
+

@@ -29,3 +29,7 @@ The server should responds either with json data or a simple status code. Since 
 The client is made with ratatui. It should be a very simply UI, no bells and whistles; simply a way to get and send info to the Server.
 
 We use CLI arguments to preset some config options -> the server url and the username.
+
+The client comes with a **single** worker thread to interact with the server. The state holds a queue to which WorkerRequests can be added. The worker polls for events one at a time and performs them, sending a WorkerEvent. There is an Error WorkerEvent to communicate errors.
+
+Note that whilst the TUI is active (which is most of the time), we do NOT log. Logging is for errors during startup and exiting. Errors can be communicated using the AppState. There is no room for fatal errors yet, but this could be created if necessary.

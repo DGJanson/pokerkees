@@ -57,6 +57,7 @@ pub struct UIState {
     pub selected_index: usize,
 }
 
+#[derive(PartialEq)]
 pub enum UIScreenMode {
     // The main state of the UI
     // Draw general info
@@ -137,4 +138,20 @@ pub fn init_state(
 pub fn reset_sessions(state: &mut AppState) {
     state.available_sessions.clear();
     state.ui_state.selected_index = 0;
+}
+
+/// Set active session based on the
+/// selected available session
+pub fn select_session(state: &mut AppState) {
+    // We assume this function is only called from
+    // a sensible location in the program.
+    // Hence we only check program failure states
+    // not logical failure states
+    if state.ui_state.selected_index < state.available_sessions.len() {
+        state.selected_session = state
+            .available_sessions
+            .get(state.ui_state.selected_index)
+            .cloned()
+            .unwrap_or_default();
+    }
 }

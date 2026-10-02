@@ -108,6 +108,9 @@ fn handle_request(request: WorkerRequest, client: &Client) -> WorkerEvent {
     }
 }
 
+// Functions used by the worker
+// Note that errors should be returned as an event, not logged please.
+// (It will mess with the interface if we log)
 fn check_server_connection(url_opt: Option<Url>, client: &Client) -> WorkerEvent {
     let Some(url) = url_opt else {
         return WorkerEvent::ServerHealth { ok: false };
@@ -152,26 +155,19 @@ fn get_sessions(url: Url, client: &Client) -> WorkerEvent {
                     "Error polling for sessions. Server returned status {}",
                     resp.status()
                 );
-                log::warn!("{msg}");
                 return WorkerEvent::Error(msg);
             }
 
             match resp.text() {
                 Ok(body) => parse_get_sessions(body.as_str()),
-                Err(e) => {
-                    log::warn!("Error reading sessions response body: {e}");
-                    WorkerEvent::Error(
-                        "Error polling for sessions. Could not read server response".to_string(),
-                    )
-                }
+                Err(_) => WorkerEvent::Error(
+                    "Error polling for sessions. Could not read server response".to_string(),
+                ),
             }
         }
-        Err(e) => {
-            log::warn!("Got an erroneous response from server while fetching sessions. Error {e}");
-            WorkerEvent::Error(String::from(
-                "Error polling for sessions. Could not get sessions list",
-            ))
-        }
+        Err(_) => WorkerEvent::Error(String::from(
+            "Error polling for sessions. Could not get sessions list",
+        )),
     }
 }
 
@@ -205,16 +201,12 @@ fn create_session(url: Url, session_name: &str, client: &Client) -> WorkerEvent 
                 } else {
                     format!("Error creating session. Server returned status {status}")
                 };
-                log::warn!("{msg}");
                 WorkerEvent::Error(msg)
             }
         }
-        Err(e) => {
-            log::warn!("Error sending create session request: {e}");
-            WorkerEvent::Error(String::from(
-                "Error creating session. Could not reach server",
-            ))
-        }
+        Err(e) => WorkerEvent::Error(String::from(
+            "Error creating session. Could not reach server",
+        )),
     }
 }
 
@@ -246,15 +238,11 @@ fn delete_session(url: Url, session_name: &str, client: &Client) -> WorkerEvent 
                 } else {
                     format!("Error deleting session. Server returned status {status}")
                 };
-                log::warn!("{msg}");
                 WorkerEvent::Error(msg)
             }
         }
-        Err(e) => {
-            log::warn!("Error sending delete session request: {e}");
-            WorkerEvent::Error(String::from(
-                "Error deleting session. Could not reach server",
-            ))
-        }
+        Err(e) => WorkerEvent::Error(String::from(
+            "Error deleting session. Could not reach server",
+        )),
     }
 }

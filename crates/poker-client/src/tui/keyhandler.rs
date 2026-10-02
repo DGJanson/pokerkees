@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::{
-    state::{AppState, InputType, UIScreenMode, reset_sessions},
+    state::{AppState, InputType, UIScreenMode, reset_sessions, select_session},
     worker::WorkerRequest,
 };
 
@@ -23,6 +23,11 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
     if state.app_error.is_some() {
         // remove and return
         state.app_error = None;
+        return;
+    }
+    if state.worker_error.is_some() {
+        // remove and return
+        state.worker_error = None;
         return;
     }
 
@@ -58,6 +63,10 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
                 if state.ui_state.selected_index > 0 {
                     state.ui_state.selected_index -= 1;
                 }
+            }
+            KeyCode::Enter => {
+                select_session(state);
+                state.ui_state.screen_mode = UIScreenMode::Main;
             }
             KeyCode::Char('C') => {
                 set_input(state, InputType::NewSession);

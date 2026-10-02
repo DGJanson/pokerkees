@@ -31,6 +31,11 @@ pub fn draw_ui(frame: &mut Frame, state: &mut AppState) {
     // If there is an error, we ALWAYS draw it at top of rightbox
     if state.app_error.is_some() {
         draw_error(frame, state.app_error.as_deref(), right_box);
+        return;
+    }
+
+    if state.worker_error.is_some() {
+        draw_error(frame, state.worker_error.as_deref(), right_box);
     }
 }
 
@@ -129,13 +134,15 @@ fn draw_left_box(frame: &mut Frame, state: &mut AppState, outer_area: Rect) {
     frame.render_widget(Block::new().borders(Borders::RIGHT), outer_area);
     let area = get_inner_rect(outer_area, 1, 2, 1, 1);
 
-    let lines = if state.user_name.is_empty() || state.server_url.is_none() {
+    let mut lines = if state.user_name.is_empty() || state.server_url.is_none() {
         build_setup_lines(state)
     } else if state.selected_session.is_empty() {
         build_no_session_lines(state)
     } else {
         build_session_lines(state)
     };
+
+    lines.extend(show_available_shortcuts_left(state));
 
     frame.render_widget(
         Paragraph::new(Text::from(lines)).wrap(Wrap { trim: false }),
@@ -203,11 +210,6 @@ fn build_no_session_lines(state: &AppState) -> Vec<Line> {
         "No session selected. You can look for one on server or create one.",
     ));
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::from("Use "),
-        Span::styled("s ", Style::default().fg(Color::Blue)),
-        Span::from("to open the session menu."),
-    ]));
     lines
 }
 
@@ -216,10 +218,18 @@ fn build_session_lines(state: &AppState) -> Vec<Line> {
     lines.push(Line::from("Session:").style(Style::default().fg(Color::Yellow)));
     lines.push(Line::from(state.selected_session.as_str()));
     lines.push(Line::from(""));
-    lines.push(Line::from(vec![
-        Span::from("Use "),
-        Span::styled("s ", Style::default().fg(Color::Blue)),
-        Span::from("to open the session menu."),
-    ]));
+    lines
+}
+
+fn show_available_shortcuts_left(state: &AppState) -> Vec<Line> {
+    let mut lines = Vec::new();
+    if state.server_connected && state.ui_state.screen_mode == UIScreenMode::Main {
+        lines.push(Line::from(vec![
+            Span::from("Use "),
+            Span::styled("s ", Style::default().fg(Color::Blue)),
+            Span::from("to open the session menu."),
+        ]));
+    }
+
     lines
 }

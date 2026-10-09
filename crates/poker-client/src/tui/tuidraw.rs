@@ -16,8 +16,7 @@ use super::{
     layoututils::{
         get_center_rect, get_inner_rect, get_inner_rect_pad, horizontal_left_divide_by_cells,
     },
-    screens::session::draw_session_info,
-    screens::main::draw_main_screen,
+    screens::{item::draw_item_screen, main::draw_main_screen, session::draw_session_info},
 };
 
 pub fn draw_ui(frame: &mut Frame, state: &mut AppState) {
@@ -107,6 +106,9 @@ fn draw_right_box(frame: &mut Frame, state: &mut AppState, outer_area: Rect) {
         }
         UIScreenMode::Input => {
             draw_input_box(frame, state, outer_area);
+        }
+        UIScreenMode::Item => {
+            draw_item_screen(frame, state, outer_area);
         }
     }
 }

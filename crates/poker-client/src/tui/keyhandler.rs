@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::{
-    state::{AppState, InputType, UIScreenMode, reset_sessions, select_session},
+    state::{AppState, InputType, UIScreenMode, reset_sessions, select_item, select_session},
     worker::WorkerRequest,
 };
 
@@ -70,6 +70,9 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
                     state.ui_state.selected_index -= 1;
                 }
             }
+            KeyCode::Enter => {
+                select_item(state);
+            }
             _ => {}
         },
         UIScreenMode::Session => match key.code {
@@ -102,6 +105,55 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
                     ));
                 }
                 state.ui_state.screen_mode = UIScreenMode::Main;
+            }
+            _ => {}
+        },
+        UIScreenMode::Item => match key.code {
+            KeyCode::Esc => {
+                state.ui_state.screen_mode = UIScreenMode::Main;
+                state.ui_state.selected_index = 0;
+                state.selected_item = 0;
+                state.selected_item_info = None;
+            }
+            KeyCode::Char('v') => {
+                // Only vote if item NOT done
+                if let Some(item) = &state.selected_item_info {
+                    if !item.done {
+                        set_input(state, InputType::Vote);
+                    }
+                } else {
+                    // not enough info
+                    // allow vote
+                    set_input(state, InputType::Vote);
+                }
+            }
+            KeyCode::Char('R') => {
+                // Send a reveal request to server
+                if let Some(url) = &state.server_url {
+                    state.worker.tasks.push_back(WorkerRequest::RevealItem(
+                        url.clone(),
+                        state.selected_session.clone(),
+                        state.selected_item,
+                    ));
+                }
+                // We already update item state locally (optimistically)
+                if let Some(item) = state.selected_item_info.as_mut() {
+                    item.revealed = true;
+                }
+            }
+            KeyCode::Char('C') => {
+                // send a close request to server
+                if let Some(url) = &state.server_url {
+                    state.worker.tasks.push_back(WorkerRequest::FinishItem(
+                        url.clone(),
+                        state.selected_session.clone(),
+                        state.selected_item,
+                    ));
+                }
+                // Optimistically update locally
+                if let Some(item) = state.selected_item_info.as_mut() {
+                    item.done = true;
+                }
             }
             _ => {}
         },

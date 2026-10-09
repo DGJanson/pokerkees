@@ -34,6 +34,9 @@ pub fn set_input(state: &mut AppState, input_type: InputType) {
         InputType::NewItemText => {
             state.ui_state.input_value = String::new();
         }
+        InputType::Vote => {
+            state.ui_state.input_value = String::new();
+        }
     }
     state.ui_state.input_type = input_type;
 }
@@ -64,6 +67,11 @@ pub fn handle_confirm_input(state: &mut AppState) {
             reset_input(state);
         }
         InputType::UserName => {
+            if state.ui_state.input_value.len() > 20 {
+                state.app_error = Some("Usernames can not be longer than 20 chars".to_string());
+                set_input(state, InputType::UserName);
+                return;
+            }
             state.user_name = state.ui_state.input_value.clone();
             // Reset screen state
             reset_input(state);
@@ -113,6 +121,34 @@ pub fn handle_confirm_input(state: &mut AppState) {
             }
             // Reset screen state
             reset_input(state);
+        }
+        InputType::Vote => {
+            // We are quite sure it is a valid integer
+            // since we only accepted digit chars
+            // Get the vote value and send to server
+            let vote_amount: usize = state.ui_state.input_value.parse().unwrap_or_default();
+            if let Some(url) = &state.server_url {
+                state.worker.tasks.push_back(WorkerRequest::VoteForItem(
+                    url.clone(),
+                    state.selected_session.clone(),
+                    state.selected_item,
+                    state.user_name.clone(),
+                    vote_amount,
+                ));
+            }
+            // We update our vote hashmap client side already
+            // We assume the vote will be handled by server
+            // if an error occurs the user will be informed
+            // in a next refresh of item info, the real
+            // up-to-date hashmap will be fetched
+            if let Some(item) = state.selected_item_info.as_mut() {
+                item.votes.insert(state.user_name.clone(), vote_amount);
+            }
+
+            // reset and return to ITEM screen
+            state.ui_state.input_value = String::new();
+            state.ui_state.selected_index = 0;
+            state.ui_state.screen_mode = UIScreenMode::Item;
         }
     }
 }
@@ -164,6 +200,7 @@ fn accept_char(c: char, modifiers: KeyModifiers, input_type: &InputType) -> bool
         InputType::UserName => is_allowed_username_char(c),
         // Numeric input
         InputType::NewItemId => is_allowed_numeric(c),
+        InputType::Vote => is_allowed_numeric(c),
         // General fallback – allow printable ASCII and space
         _ => is_general_allowed_char(c),
     }

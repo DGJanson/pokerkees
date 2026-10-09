@@ -27,8 +27,13 @@ fn main() {
     log::info!("Booting Pokerkees client");
     // Start by reading cli stuff
     let cli = Cli::parse();
+    let mut name = String::new();
     if !cli.name.is_empty() {
+        if cli.name.len() > 20 {
+            log::warn!("Name from cli too long. Only 20 chars allowed");
+        }
         log::info!("Using name from cli arguments");
+        name = cli.name;
     }
     let mut url: Option<Url> = None;
     if !cli.url.is_empty() {
@@ -43,7 +48,7 @@ fn main() {
 
     let (s, r, handle) = spawn_worker();
 
-    let state = state::init_state(cli.name, url, s, r);
+    let state = state::init_state(name, url, s, r);
 
     let tui_exit = start_tui(state);
 

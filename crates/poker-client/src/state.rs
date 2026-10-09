@@ -7,7 +7,7 @@ use std::{
     time::Instant,
 };
 
-use poker_shared::ItemInfo;
+use poker_shared::{ItemInfo, PokerItem};
 use url::Url;
 
 use crate::worker::{WorkerEvent, WorkerRequest};
@@ -23,6 +23,7 @@ pub struct AppState {
     pub server_connected: bool,
     pub time_last_server_check: Instant,
     pub time_last_item_fetch: Instant,
+    pub time_last_item_info_fetch: Instant,
 
     // session
     pub selected_session: String,
@@ -30,6 +31,7 @@ pub struct AppState {
 
     // item
     pub selected_item: usize,
+    pub selected_item_info: Option<PokerItem>,
     pub active_items: Vec<ItemInfo>,
     pub closed_items: Vec<ItemInfo>,
 
@@ -73,6 +75,10 @@ pub enum UIScreenMode {
     // Used in combination with tje input_type
     // from the UIState to manage the input
     Input,
+    // The screen in which a user can interact
+    // with an item. Such as casting a vote
+    // or revealing.
+    Item,
 }
 
 /// The possible values of input type
@@ -84,6 +90,7 @@ pub enum InputType {
     NewSession,
     NewItemId,
     NewItemText,
+    Vote,
 }
 
 impl fmt::Display for InputType {
@@ -95,6 +102,7 @@ impl fmt::Display for InputType {
             Self::NewSession => write!(f, "Session name"),
             Self::NewItemId => write!(f, "Item ID"),
             Self::NewItemText => write!(f, "Item (short) description"),
+            Self::Vote => write!(f, "Vote"),
         }
     }
 }
@@ -132,9 +140,11 @@ pub fn init_state(
         server_connected: false,
         time_last_server_check: Instant::now(),
         time_last_item_fetch: Instant::now(),
+        time_last_item_info_fetch: Instant::now(),
         selected_session: String::new(),
         available_sessions: Vec::new(),
         selected_item: 0,
+        selected_item_info: None,
         active_items: Vec::new(),
         closed_items: Vec::new(),
         should_exit: false,
@@ -171,5 +181,28 @@ pub fn select_session(state: &mut AppState) {
             url.clone(),
             state.selected_session.clone(),
         ));
+    }
+}
+
+/// Sets the selected item as active
+pub fn select_item(state: &mut AppState) {
+    // try to figure out which item is selected
+    // There can be a condition in which the item list is
+    // refreshed, changing indeces between selecting and enter
+    // key press.
+    // This seems highly unlikely, and we ignore for now
+    if state.ui_state.selected_index < state.active_items.len() {
+        if let Some(item_info) = state.active_items.get(state.ui_state.selected_index) {
+            state.selected_item = item_info.id;
+            state.ui_state.screen_mode = UIScreenMode::Item;
+            // We can fetch extra info on item now
+            if let Some(url) = &state.server_url {
+                state.worker.tasks.push_back(WorkerRequest::GetItemInfo(
+                    url.clone(),
+                    state.selected_session.clone(),
+                    item_info.id,
+                ));
+            }
+        }
     }
 }

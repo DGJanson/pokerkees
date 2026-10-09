@@ -25,3 +25,11 @@ pub struct PokerItem {
     /// Whether the items has been handled completely
     pub done: bool,
 }
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+pub struct ItemInfo {
+    pub id: usize,
+    pub revealed: bool,
+    pub done: bool,
+    pub item_title: String,
+}

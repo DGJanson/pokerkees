@@ -1,14 +1,8 @@
 use serde_json::Value;
 
-use crate::worker::WorkerEvent;
+use poker_shared::ItemInfo;
 
-// Item info in items list
-#[derive(Debug, Clone)]
-pub struct ItemInfo {
-    pub id: usize,
-    pub revealed: bool,
-    pub done: bool,
-}
+use crate::worker::WorkerEvent;
 
 // Parse response for GET /items
 // Accept both a raw array of items or an object containing "items": [...]
@@ -16,41 +10,29 @@ pub fn parse_get_items(body: &str) -> WorkerEvent {
     match serde_json::from_str::<Value>(body) {
         Ok(Value::Array(arr)) => match parse_items_array(&arr) {
             Ok(items) => WorkerEvent::Items { items },
-            Err(msg) => {
-                log::warn!("{msg}. Body: {body}");
-                WorkerEvent::Error(msg)
-            }
+            Err(msg) => WorkerEvent::Error(msg),
         },
         Ok(Value::Object(map)) => match map.get("items") {
             Some(Value::Array(arr)) => match parse_items_array(arr) {
                 Ok(items) => WorkerEvent::Items { items },
-                Err(msg) => {
-                    log::warn!("{msg}. Body: {body}");
-                    WorkerEvent::Error(msg)
-                }
+                Err(msg) => WorkerEvent::Error(msg),
             },
             Some(_) => {
                 let msg = "Error parsing items: 'items' field is not an array".to_string();
-                log::warn!("{msg}. Body: {body}");
                 WorkerEvent::Error(msg)
             }
             None => {
                 let msg = "Error parsing items: missing 'items' field".to_string();
-                log::warn!("{msg}. Body: {body}");
                 WorkerEvent::Error(msg)
             }
         },
         Ok(_) => {
             let msg = "Error parsing items: unexpected JSON structure".to_string();
-            log::warn!("{msg}. Body: {body}");
             WorkerEvent::Error(msg)
         }
-        Err(_) => {
-            log::warn!("Error parsing items JSON. Body: {body}");
-            WorkerEvent::Error(
-                "Error polling for items. Could not parse server response".to_string(),
-            )
-        }
+        Err(_) => WorkerEvent::Error(
+            "Error polling for items. Could not parse server response".to_string(),
+        ),
     }
 }
 
@@ -79,7 +61,17 @@ fn parse_items_array(arr: &[Value]) -> Result<Vec<ItemInfo>, String> {
             _ => return Err("Error parsing items: missing or invalid 'done'".to_string()),
         };
 
-        items.push(ItemInfo { id, revealed, done });
+        let item_title = match map.get("item_title") {
+            Some(s) => s.to_string(),
+            _ => return Err("Error parsing items: missing or invalild 'item_title'".to_string()),
+        };
+
+        items.push(ItemInfo {
+            id,
+            revealed,
+            done,
+            item_title,
+        });
     }
     Ok(items)
 }
@@ -89,12 +81,8 @@ fn parse_items_array(arr: &[Value]) -> Result<Vec<ItemInfo>, String> {
 pub fn parse_get_item_info(body: &str) -> WorkerEvent {
     match serde_json::from_str::<poker_shared::PokerItem>(body) {
         Ok(item) => WorkerEvent::ItemInfo { item },
-        Err(e) => {
-            let msg = format!("Error parsing item info JSON: {e}");
-            log::warn!("{msg}. Body: {body}");
-            WorkerEvent::Error(
-                "Error fetching item info. Could not parse server response".to_string(),
-            )
-        }
+        Err(_) => WorkerEvent::Error(
+            "Error fetching item info. Could not parse server response".to_string(),
+        ),
     }
 }

@@ -28,6 +28,12 @@ pub fn set_input(state: &mut AppState, input_type: InputType) {
         InputType::NewSession => {
             state.ui_state.input_value = String::new();
         }
+        InputType::NewItemId => {
+            state.ui_state.input_value = String::new();
+        }
+        InputType::NewItemText => {
+            state.ui_state.input_value = String::new();
+        }
     }
     state.ui_state.input_type = input_type;
 }
@@ -54,8 +60,14 @@ pub fn handle_confirm_input(state: &mut AppState) {
                 .push_back(WorkerRequest::CheckServerConnection(
                     state.server_url.clone(),
                 ));
+            // Reset screen state
+            reset_input(state);
         }
-        InputType::UserName => state.user_name = state.ui_state.input_value.clone(),
+        InputType::UserName => {
+            state.user_name = state.ui_state.input_value.clone();
+            // Reset screen state
+            reset_input(state);
+        }
         InputType::NewSession => {
             // In this case we only send the create request to server
             // After this succeeds, we activate the session in the app
@@ -65,15 +77,50 @@ pub fn handle_confirm_input(state: &mut AppState) {
                     state.ui_state.input_value.clone(),
                 ));
             }
+            // Reset screen state
+            reset_input(state);
+        }
+        InputType::NewItemId => {
+            // Continue to input for item desc
+            // Store item Id in selecten item for the meantime
+            // We are quite sure it is a numeric value, since we
+            // only accept digit chars
+            let item_nr: usize = state.ui_state.input_value.parse().unwrap_or_default();
+            if item_nr == 0 {
+                state.app_error = Some(String::from("Item nr can not be zero"));
+                reset_input(state);
+                return;
+            }
+            state.selected_item = item_nr;
+            set_input(state, InputType::NewItemText);
+        }
+        InputType::NewItemText => {
+            // Send a post request to the server to create the item
+            // Then return to main screen
+            // It should fill with info on the item
+            let item_desc = if state.ui_state.input_value.is_empty() {
+                None
+            } else {
+                Some(state.ui_state.input_value.clone())
+            };
+            if let Some(url) = &state.server_url {
+                state.worker.tasks.push_back(WorkerRequest::CreateItem(
+                    url.clone(),
+                    state.selected_session.clone(),
+                    state.selected_item,
+                    item_desc,
+                ));
+            }
+            // Reset screen state
+            reset_input(state);
         }
     }
-    // Reset screen state
-    reset_input(state);
 }
 
 pub fn reset_input(state: &mut AppState) {
     state.ui_state.screen_mode = UIScreenMode::Main;
     state.ui_state.input_value = String::new();
+    state.ui_state.selected_index = 0;
 }
 
 /// This function decides what to do with the user input (key)
@@ -115,6 +162,8 @@ fn accept_char(c: char, modifiers: KeyModifiers, input_type: &InputType) -> bool
         InputType::Server => is_allowed_url_char(c),
         // Username: letters, digits, space and a few commonly-used separators
         InputType::UserName => is_allowed_username_char(c),
+        // Numeric input
+        InputType::NewItemId => is_allowed_numeric(c),
         // General fallback – allow printable ASCII and space
         _ => is_general_allowed_char(c),
     }
@@ -122,6 +171,10 @@ fn accept_char(c: char, modifiers: KeyModifiers, input_type: &InputType) -> bool
 
 fn is_general_allowed_char(c: char) -> bool {
     c == ' ' || c.is_ascii_graphic()
+}
+
+fn is_allowed_numeric(c: char) -> bool {
+    c.is_ascii_digit()
 }
 
 // Per RFC 3986: unreserved = ALPHA / DIGIT / "-" / "." / "_" / "~"

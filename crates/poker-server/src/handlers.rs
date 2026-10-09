@@ -5,7 +5,7 @@ use axum::{
     extract::{Query, State},
     http::StatusCode,
 };
-use poker_shared::{PokerItem, PokerSession};
+use poker_shared::{ItemInfo, PokerItem, PokerSession};
 
 use crate::AppState;
 
@@ -79,13 +79,6 @@ pub struct GetItemsQuery {
 }
 
 #[derive(serde::Serialize)]
-pub struct ItemInfo {
-    id: usize,
-    revealed: bool,
-    done: bool,
-}
-
-#[derive(serde::Serialize)]
 pub struct ItemsResponse {
     items: Vec<ItemInfo>,
 }
@@ -111,6 +104,7 @@ pub async fn get_items(
             id: *id,
             revealed: item.revealed,
             done: item.done,
+            item_title: item.item_title.clone(),
         })
         .collect::<Vec<_>>();
 
@@ -134,6 +128,11 @@ pub async fn post_items(State(state): State<AppState>, Json(req): Json<PostItem>
 
     if session.items.contains_key(&req.item_id) {
         return StatusCode::CONFLICT;
+    }
+
+    // We do not accept items with zero (or lower)
+    if req.item_id < 1 {
+        return StatusCode::BAD_REQUEST;
     }
 
     session.items.insert(

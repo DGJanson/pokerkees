@@ -6,9 +6,9 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use handlers::items::{ItemInfo as ItemsListItem, parse_get_item_info, parse_get_items};
+use handlers::items::{parse_get_item_info, parse_get_items};
 use handlers::sessions::parse_get_sessions;
-use poker_shared::PokerItem;
+use poker_shared::{ItemInfo, PokerItem};
 use reqwest::blocking::Client;
 use url::Url;
 
@@ -46,7 +46,7 @@ pub enum WorkerEvent {
     DeletedSession,
 
     // Items list for a session
-    Items { items: Vec<ItemsListItem> },
+    Items { items: Vec<ItemInfo> },
     // Detailed info of a single item
     ItemInfo { item: PokerItem },
     // Item created

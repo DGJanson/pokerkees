@@ -7,6 +7,7 @@ use std::{
     time::Instant,
 };
 
+use poker_shared::ItemInfo;
 use url::Url;
 
 use crate::worker::{WorkerEvent, WorkerRequest};
@@ -21,6 +22,7 @@ pub struct AppState {
     // server
     pub server_connected: bool,
     pub time_last_server_check: Instant,
+    pub time_last_item_fetch: Instant,
 
     // session
     pub selected_session: String,
@@ -28,6 +30,8 @@ pub struct AppState {
 
     // item
     pub selected_item: usize,
+    pub active_items: Vec<ItemInfo>,
+    pub closed_items: Vec<ItemInfo>,
 
     // App flow logic
     pub should_exit: bool,
@@ -78,6 +82,8 @@ pub enum InputType {
     Server,
     UserName,
     NewSession,
+    NewItemId,
+    NewItemText,
 }
 
 impl fmt::Display for InputType {
@@ -87,6 +93,8 @@ impl fmt::Display for InputType {
             Self::Server => write!(f, "Server Url"),
             Self::UserName => write!(f, "User name"),
             Self::NewSession => write!(f, "Session name"),
+            Self::NewItemId => write!(f, "Item ID"),
+            Self::NewItemText => write!(f, "Item (short) description"),
         }
     }
 }
@@ -123,9 +131,12 @@ pub fn init_state(
         server_url: url,
         server_connected: false,
         time_last_server_check: Instant::now(),
+        time_last_item_fetch: Instant::now(),
         selected_session: String::new(),
         available_sessions: Vec::new(),
         selected_item: 0,
+        active_items: Vec::new(),
+        closed_items: Vec::new(),
         should_exit: false,
         ui_state,
         worker: worker_state,
@@ -153,5 +164,12 @@ pub fn select_session(state: &mut AppState) {
             .get(state.ui_state.selected_index)
             .cloned()
             .unwrap_or_default();
+    }
+    // We also send a request to fetch items
+    if let Some(url) = &state.server_url {
+        state.worker.tasks.push_back(WorkerRequest::GetItems(
+            url.clone(),
+            state.selected_session.clone(),
+        ));
     }
 }

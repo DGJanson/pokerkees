@@ -11,6 +11,7 @@ use crate::worker::{WorkerEvent, WorkerRequest};
 use super::AppState;
 
 const HEALTH_CHECK_MILLI: Duration = Duration::from_millis(8000);
+const ITEM_FETCH_MILLI: Duration = Duration::from_millis(5000);
 
 /// Main function that deals with the worker
 /// Checks the queue and handles results
@@ -29,6 +30,23 @@ pub fn check_worker_logic(state: &mut AppState) {
                 .push_back(WorkerRequest::CheckServerConnection(
                     state.server_url.clone(),
                 ));
+        }
+
+        if state.time_last_item_fetch.elapsed() >= ITEM_FETCH_MILLI {
+            // We only check if we have an active session
+            if !state.selected_session.is_empty() {
+                // It should be impossible to NOT have
+                // a server url here...
+                // But check anyway
+                if let Some(url) = &state.server_url {
+                    state.worker.tasks.push_back(WorkerRequest::GetItems(
+                        url.clone(),
+                        state.selected_session.clone(),
+                    ));
+                }
+            } else {
+                // reset timer, do not check again for a while
+            }
         }
     }
 
@@ -80,12 +98,33 @@ fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
         }
 
         // New item-related events: no-ops for now (UI/state not wired yet)
-        WorkerEvent::Items { items: _ } => {}
+        WorkerEvent::Items { items } => {
+            // We divide the received items in active and closed items
+            // and store in state
+            state.active_items.clear();
+            state.closed_items.clear();
+            for item in items.iter() {
+                if item.done {
+                    state.closed_items.push(item.clone());
+                } else {
+                    state.active_items.push(item.clone());
+                }
+            }
+
+            state.time_last_item_fetch = Instant::now();
+        }
         WorkerEvent::ItemInfo { item: _ } => {}
-        WorkerEvent::CreatedItem { item_id: _ } => {}
+        WorkerEvent::CreatedItem { item_id: _ } => {
+            // Get required info and update list
+            if let Some(url) = &state.server_url {
+                state.worker.tasks.push_back(WorkerRequest::GetItems(
+                    url.clone(),
+                    state.selected_session.clone(),
+                ));
+            }
+        }
         WorkerEvent::ItemRevealed => {}
         WorkerEvent::ItemFinished => {}
         WorkerEvent::ItemVoted => {}
     }
 }
-

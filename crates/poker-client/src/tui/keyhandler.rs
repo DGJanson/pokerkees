@@ -50,10 +50,33 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
             }
             KeyCode::Char('U') => set_input(state, InputType::Server),
             KeyCode::Char('N') => set_input(state, InputType::UserName),
+            // Now we check state and send key to appropriate handler
+            KeyCode::Char('C') => {
+                // Only makes sense when we have a session selected
+                if !state.selected_session.is_empty() {
+                    set_input(state, InputType::NewItemId);
+                }
+            }
+
+            // select item
+            KeyCode::Char('j') => {
+                let length = state.active_items.len();
+                if state.ui_state.selected_index + 1 < length {
+                    state.ui_state.selected_index += 1;
+                }
+            }
+            KeyCode::Char('k') => {
+                if state.ui_state.selected_index > 0 {
+                    state.ui_state.selected_index -= 1;
+                }
+            }
             _ => {}
         },
         UIScreenMode::Session => match key.code {
-            KeyCode::Esc => state.ui_state.screen_mode = UIScreenMode::Main,
+            KeyCode::Esc => {
+                state.ui_state.screen_mode = UIScreenMode::Main;
+                state.ui_state.selected_index = 0;
+            }
             KeyCode::Char('j') => {
                 if state.ui_state.selected_index + 1 < state.available_sessions.len() {
                     state.ui_state.selected_index += 1;

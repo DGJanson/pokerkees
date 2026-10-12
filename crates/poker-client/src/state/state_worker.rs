@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::worker::{WorkerEvent, WorkerRequest};
 
-use super::AppState;
+use super::{AppState, reset_session_info};
 
 const HEALTH_CHECK_MILLI: Duration = Duration::from_millis(8000);
 // item list
@@ -105,11 +105,15 @@ fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
         }
         WorkerEvent::Error(error_msg) => {
             state.worker_error = Some(error_msg.clone());
+            // reset timers, or we can get looped errors
+            state.time_last_item_fetch = Instant::now();
+            state.time_last_item_info_fetch = Instant::now();
         }
         WorkerEvent::Sessions { sessions } => {
             state.available_sessions = sessions;
         }
         WorkerEvent::CreatedSession(session) => {
+            reset_session_info(state);
             state.selected_session = session;
         }
         WorkerEvent::DeletedSession => {
@@ -134,6 +138,16 @@ fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
             state.time_last_item_fetch = Instant::now();
         }
         WorkerEvent::ItemInfo { item } => {
+            // We need to update our users list when we see votes
+            for username in item.votes.keys() {
+                if username != &state.user_name && !state.known_users.contains(username) {
+                    state.known_users.push(username.clone());
+                }
+                // To prevent superfluous sort calls,
+                // we only sort when we have found a new user
+                // This is more efficient in the long run :)
+                state.known_users.sort_by_key(|a| a.to_lowercase());
+            }
             state.selected_item_info = Some(item);
             state.time_last_item_info_fetch = Instant::now();
         }

@@ -99,7 +99,11 @@ fn draw_right_box(frame: &mut Frame, state: &mut AppState, outer_area: Rect) {
     // match on state right away
     match state.ui_state.screen_mode {
         UIScreenMode::Main => {
-            draw_main_screen(frame, state, outer_area);
+            // We only draw this screen
+            // when we have a session
+            if !state.selected_session.is_empty() {
+                draw_main_screen(frame, state, outer_area);
+            }
         }
         UIScreenMode::Session => {
             draw_session_info(frame, state, outer_area);

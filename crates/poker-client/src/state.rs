@@ -28,12 +28,16 @@ pub struct AppState {
     // session
     pub selected_session: String,
     pub available_sessions: Vec<String>,
+    /// known users, except self!
+    pub known_users: Vec<String>,
 
     // item
     pub selected_item: usize,
     pub selected_item_info: Option<PokerItem>,
     pub active_items: Vec<ItemInfo>,
     pub closed_items: Vec<ItemInfo>,
+    // item to temp store id whilst creating
+    pub create_item_id: usize,
 
     // App flow logic
     pub should_exit: bool,
@@ -143,10 +147,12 @@ pub fn init_state(
         time_last_item_info_fetch: Instant::now(),
         selected_session: String::new(),
         available_sessions: Vec::new(),
+        known_users: Vec::new(),
         selected_item: 0,
         selected_item_info: None,
         active_items: Vec::new(),
         closed_items: Vec::new(),
+        create_item_id: 0,
         should_exit: false,
         ui_state,
         worker: worker_state,
@@ -161,6 +167,19 @@ pub fn reset_sessions(state: &mut AppState) {
     state.ui_state.selected_index = 0;
 }
 
+/// Resets all information related to a session
+/// use this to prevent info, like users, items,
+/// leaking between sessions, when a user changes
+/// sessions in the client.
+pub fn reset_session_info(state: &mut AppState) {
+    state.active_items.clear();
+    state.closed_items.clear();
+    state.known_users.clear();
+    state.selected_item = 0;
+    state.selected_item_info = None;
+    state.ui_state.selected_index = 0;
+}
+
 /// Set active session based on the
 /// selected available session
 pub fn select_session(state: &mut AppState) {
@@ -169,18 +188,19 @@ pub fn select_session(state: &mut AppState) {
     // Hence we only check program failure states
     // not logical failure states
     if state.ui_state.selected_index < state.available_sessions.len() {
+        reset_session_info(state);
         state.selected_session = state
             .available_sessions
             .get(state.ui_state.selected_index)
             .cloned()
             .unwrap_or_default();
-    }
-    // We also send a request to fetch items
-    if let Some(url) = &state.server_url {
-        state.worker.tasks.push_back(WorkerRequest::GetItems(
-            url.clone(),
-            state.selected_session.clone(),
-        ));
+        // We also send a request to fetch items
+        if let Some(url) = &state.server_url {
+            state.worker.tasks.push_back(WorkerRequest::GetItems(
+                url.clone(),
+                state.selected_session.clone(),
+            ));
+        }
     }
 }
 

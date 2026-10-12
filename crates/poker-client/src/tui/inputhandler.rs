@@ -72,6 +72,13 @@ pub fn handle_confirm_input(state: &mut AppState) {
                 set_input(state, InputType::UserName);
                 return;
             }
+            // Check if we the username has been used by someone else
+            // THIS IS NOT A PERFECT CHECK, but the best we can do now
+            if state.known_users.contains(&state.ui_state.input_value) {
+                state.app_error = Some("Username already used by someone else".to_string());
+                set_input(state, InputType::UserName);
+                return;
+            }
             state.user_name = state.ui_state.input_value.clone();
             // Reset screen state
             reset_input(state);
@@ -99,7 +106,8 @@ pub fn handle_confirm_input(state: &mut AppState) {
                 reset_input(state);
                 return;
             }
-            state.selected_item = item_nr;
+            // temp store number, we need it later
+            state.create_item_id = item_nr;
             set_input(state, InputType::NewItemText);
         }
         InputType::NewItemText => {
@@ -115,7 +123,7 @@ pub fn handle_confirm_input(state: &mut AppState) {
                 state.worker.tasks.push_back(WorkerRequest::CreateItem(
                     url.clone(),
                     state.selected_session.clone(),
-                    state.selected_item,
+                    state.create_item_id,
                     item_desc,
                 ));
             }

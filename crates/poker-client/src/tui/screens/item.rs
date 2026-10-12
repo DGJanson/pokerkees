@@ -85,14 +85,25 @@ fn show_item_info<'a>(item: &'a PokerItem, state: &'a AppState) -> Vec<Line<'a>>
     } else {
         lines.push(Line::from("Votes:").style(Style::default().fg(Color::Yellow)));
         lines.push(Line::default());
-        for (name, vote) in item.votes.iter() {
-            if name == state.user_name.as_str() {
-                lines.push(
-                    Line::from(format!("{name:<20} {vote}"))
-                        .style(Style::default().fg(Color::Magenta)),
-                );
+        // We use the known users to show votes
+        // start with own vote
+        if let Some(v) = item.votes.get(&state.user_name) {
+            lines.push(
+                Line::from(format!("{:<20} {v:2}", &state.user_name))
+                    .style(Style::default().fg(Color::Magenta)),
+            );
+        } else {
+            lines.push(
+                Line::from(format!("{:<20}  -", &state.user_name))
+                    .style(Style::default().fg(Color::Magenta)),
+            );
+        }
+
+        for name in state.known_users.iter() {
+            if let Some(v) = item.votes.get(name) {
+                lines.push(Line::from(format!("{name:<20} {v:2}")));
             } else {
-                lines.push(Line::from(format!("{name:<20} {vote}")));
+                lines.push(Line::from(format!("{name:<20}  -")));
             }
         }
     }

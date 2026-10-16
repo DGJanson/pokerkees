@@ -49,7 +49,7 @@ fn get_header_line() -> Vec<Line<'static>> {
 }
 
 /// Show available items
-fn show_items_info(state: &AppState) -> Vec<Line> {
+fn show_items_info(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = Vec::new();
     if state.active_items.is_empty() {
         // Base case, no available items yet

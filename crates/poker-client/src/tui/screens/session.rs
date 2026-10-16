@@ -39,7 +39,7 @@ fn get_session_header() -> Vec<Line<'static>> {
     lines
 }
 
-fn get_available_sessions(state: &AppState) -> Vec<Line> {
+fn get_available_sessions(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = vec![
         Line::default(),
         Line::from("Available sessions:").style(Style::default().fg(Color::Magenta)),

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use handlers::azure::fetch_azure_item;
 use handlers::items::{parse_get_item_info, parse_get_items};
-use handlers::sessions::{self, parse_get_sessions};
+use handlers::sessions::parse_get_sessions;
 use poker_shared::{ItemInfo, PokerItem};
 use reqwest::blocking::Client;
 use url::Url;

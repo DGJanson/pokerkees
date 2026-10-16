@@ -34,7 +34,7 @@ pub fn draw_item_screen(frame: &mut Frame, state: &mut AppState, area: Rect) {
     );
 }
 
-fn get_header_lines(state: &AppState) -> Vec<Line> {
+fn get_header_lines(state: &AppState) -> Vec<Line<'_>> {
     let lines = vec![
         Line::from(vec![
             Span::from("Use "),
@@ -121,7 +121,7 @@ fn show_item_info<'a>(item: &'a PokerItem, state: &'a AppState) -> Vec<Line<'a>>
     lines
 }
 
-fn show_azure_info(state: &AppState) -> Vec<Line> {
+fn show_azure_info(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = Vec::new();
     lines.push(Line::default());
     if !state.azure_item_cache.contains_key(&state.selected_item) {

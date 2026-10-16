@@ -177,7 +177,7 @@ fn server_url_text(state: &AppState) -> &str {
     }
 }
 
-fn header_lines(state: &AppState, include_health: bool) -> Vec<Line> {
+fn header_lines(state: &AppState, include_health: bool) -> Vec<Line<'_>> {
     let mut lines = vec![
         Line::from("Username:").style(Style::default().fg(Color::Yellow)),
         Line::from(state.user_name.as_str()),
@@ -194,7 +194,7 @@ fn header_lines(state: &AppState, include_health: bool) -> Vec<Line> {
     lines
 }
 
-fn build_setup_lines(state: &AppState) -> Vec<Line> {
+fn build_setup_lines(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = vec![
         Line::from("Welcome to PokerKees. Please setup your options first."),
         Line::from("(Note that you can use CLI parms to set these automatically.)"),
@@ -215,7 +215,7 @@ fn build_setup_lines(state: &AppState) -> Vec<Line> {
     lines
 }
 
-fn build_no_session_lines(state: &AppState) -> Vec<Line> {
+fn build_no_session_lines(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = header_lines(state, true);
     lines.push(Line::from(
         "No session selected. You can look for one on server or create one.",
@@ -224,7 +224,7 @@ fn build_no_session_lines(state: &AppState) -> Vec<Line> {
     lines
 }
 
-fn build_session_lines(state: &AppState) -> Vec<Line> {
+fn build_session_lines(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = header_lines(state, true);
     lines.push(Line::from("Session:").style(Style::default().fg(Color::Yellow)));
     lines.push(Line::from(state.selected_session.as_str()));
@@ -232,7 +232,7 @@ fn build_session_lines(state: &AppState) -> Vec<Line> {
     lines
 }
 
-fn show_available_shortcuts_left(state: &AppState) -> Vec<Line> {
+fn show_available_shortcuts_left(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = Vec::new();
     if state.server_connected && state.ui_state.screen_mode == UIScreenMode::Main {
         lines.push(Line::from(vec![
@@ -247,7 +247,7 @@ fn show_available_shortcuts_left(state: &AppState) -> Vec<Line> {
     lines
 }
 
-fn show_azure_info(state: &AppState) -> Vec<Line> {
+fn show_azure_info(state: &AppState) -> Vec<Line<'_>> {
     let mut lines = Vec::new();
 
     // we only show this if server is connected and screen mode is main

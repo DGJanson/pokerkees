@@ -38,7 +38,7 @@ The client supports azure devops integration -> it can read work item info from 
 Sync is performed using the azure cli. Specifically, the following command is performed:
 
 ```
-az board work-item show --id <id> --org <devops_org> 
+az boards work-item show --id <id> --org <devops_org> 
 ```
 
 If you can perform this command in your terminal (it may need some setting up), then pokerkees can sync with devops. For that you need to set Azure Organisation AND Azure Project in Pokerkees, either with cli arguments or in-app settings. You MUST use the same pokerkees item ids as azure work item ids. Then it will sync.

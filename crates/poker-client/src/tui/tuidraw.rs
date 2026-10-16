@@ -153,6 +153,8 @@ fn draw_left_box(frame: &mut Frame, state: &mut AppState, outer_area: Rect) {
 
     lines.extend(show_available_shortcuts_left(state));
 
+    lines.extend(show_azure_info(state));
+
     frame.render_widget(
         Paragraph::new(Text::from(lines)).wrap(Wrap { trim: false }),
         area,
@@ -238,6 +240,46 @@ fn show_available_shortcuts_left(state: &AppState) -> Vec<Line> {
             Span::styled("s ", Style::default().fg(Color::Blue)),
             Span::from("to open the session menu."),
         ]));
+    }
+
+    lines.push(Line::default());
+
+    lines
+}
+
+fn show_azure_info(state: &AppState) -> Vec<Line> {
+    let mut lines = Vec::new();
+
+    // we only show this if server is connected and screen mode is main
+    // since that is when the keys actually work
+    if state.azure_org.is_none() && state.azure_project.is_none() {
+        lines.push(Line::from("Azure fetch not active"));
+        lines.push(Line::default());
+    } else {
+        // At least one is filled
+        // render
+        lines.push(Line::from("Azure Organisation").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(state.azure_org.as_deref().unwrap_or_default()));
+        lines.push(Line::from("Azure Project").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(
+            state.azure_project.as_deref().unwrap_or_default(),
+        ));
+        lines.push(Line::default());
+        if state.azure_org.is_none() || state.azure_project.is_none() {
+            lines.push(Line::from("We need both project and org for azure fetch"));
+            lines.push(Line::default());
+        }
+    }
+
+    if state.server_connected && state.ui_state.screen_mode == UIScreenMode::Main {
+        lines.push(Line::from(vec![
+            Span::from("Use "),
+            Span::from("O").style(Style::default().fg(Color::Blue)),
+            Span::from(" or "),
+            Span::from("P").style(Style::default().fg(Color::Blue)),
+            Span::from(" to set Azure org or project."),
+        ]));
+        lines.push(Line::default());
     }
 
     lines

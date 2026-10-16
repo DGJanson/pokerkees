@@ -1,2 +1,3 @@
-pub mod sessions;
+pub mod azure;
 pub mod items;
+pub mod sessions;

@@ -151,7 +151,7 @@ fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
             state.selected_item_info = Some(item);
             state.time_last_item_info_fetch = Instant::now();
         }
-        WorkerEvent::CreatedItem { item_id: _ } => {
+        WorkerEvent::CreatedItem {} => {
             // Get required info and update list
             if let Some(url) = &state.server_url {
                 state.worker.tasks.push_back(WorkerRequest::GetItems(
@@ -172,5 +172,9 @@ fn handle_worker_event(state: &mut AppState, event: WorkerEvent) {
             }
         }
         WorkerEvent::ItemVoted => {}
+        WorkerEvent::AzureItem(awi) => {
+            // Update the hashmap
+            state.azure_item_cache.insert(awi.id, awi);
+        }
     }
 }

@@ -2,9 +2,9 @@
 
 use core::fmt;
 use std::{
-    collections::VecDeque,
+    collections::{HashMap, VecDeque},
     sync::mpsc::{Receiver, Sender},
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 use poker_shared::{ItemInfo, PokerItem};
@@ -39,6 +39,11 @@ pub struct AppState {
     // item to temp store id whilst creating
     pub create_item_id: usize,
 
+    // Azure integration
+    pub azure_org: Option<String>,
+    pub azure_project: Option<String>,
+    pub azure_item_cache: HashMap<usize, AzureWorkItem>,
+
     // App flow logic
     pub should_exit: bool,
 
@@ -65,6 +70,9 @@ pub struct UIState {
     // eg. sessions, items, etc
     // Note that we reuse this for multiple screens!
     pub selected_index: usize,
+    // Scroller,
+    // We only scroll vertically
+    pub scroll: u16,
 }
 
 #[derive(PartialEq)]
@@ -91,6 +99,8 @@ pub enum InputType {
     None,
     Server,
     UserName,
+    AzureOrg,
+    AzureProject,
     NewSession,
     NewItemId,
     NewItemText,
@@ -103,6 +113,8 @@ impl fmt::Display for InputType {
             Self::None => write!(f, "<None>"),
             Self::Server => write!(f, "Server Url"),
             Self::UserName => write!(f, "User name"),
+            Self::AzureOrg => write!(f, "Azure Organisation"),
+            Self::AzureProject => write!(f, "Azure Project"),
             Self::NewSession => write!(f, "Session name"),
             Self::NewItemId => write!(f, "Item ID"),
             Self::NewItemText => write!(f, "Item (short) description"),
@@ -118,17 +130,33 @@ pub struct WorkerState {
     pub worker_active: bool,
 }
 
+#[derive(Debug, Clone)]
+pub struct AzureWorkItem {
+    pub id: usize,
+    pub title: String,
+    pub state: String,
+    pub assigned_to: Option<String>,
+    pub tags: Vec<String>,
+    pub description: String,
+    pub acceptance_criteria: String,
+    pub created_date: String,
+    pub last_fetched_at: Instant,
+}
+
 pub fn init_state(
     name: String,
     url: Option<Url>,
     sender: Sender<WorkerRequest>,
     receiver: Receiver<WorkerEvent>,
+    azure_org: Option<String>,
+    azure_project: Option<String>,
 ) -> AppState {
     let ui_state = UIState {
         screen_mode: UIScreenMode::Main,
         input_type: InputType::None,
         input_value: String::new(),
         selected_index: 0,
+        scroll: 0,
     };
 
     let worker_state = WorkerState {
@@ -153,6 +181,9 @@ pub fn init_state(
         active_items: Vec::new(),
         closed_items: Vec::new(),
         create_item_id: 0,
+        azure_org,
+        azure_project,
+        azure_item_cache: HashMap::new(),
         should_exit: false,
         ui_state,
         worker: worker_state,
@@ -213,8 +244,10 @@ pub fn select_item(state: &mut AppState) {
     // This seems highly unlikely, and we ignore for now
     if state.ui_state.selected_index < state.active_items.len() {
         if let Some(item_info) = state.active_items.get(state.ui_state.selected_index) {
+            // update ui stuff
             state.selected_item = item_info.id;
             state.ui_state.screen_mode = UIScreenMode::Item;
+            state.ui_state.scroll = 0;
             // We can fetch extra info on item now
             if let Some(url) = &state.server_url {
                 state.worker.tasks.push_back(WorkerRequest::GetItemInfo(
@@ -222,6 +255,30 @@ pub fn select_item(state: &mut AppState) {
                     state.selected_session.clone(),
                     item_info.id,
                 ));
+            }
+            // Also check if we want to get info from azure
+            // First check if azure config complete
+            if state.azure_org.is_some() && state.azure_project.is_some() {
+                // There are two conditions in which we fetch:
+                // - no info in cache yet
+                // - stale info in cache
+                let mut get_from_azure = false;
+                if !state.azure_item_cache.contains_key(&item_info.id) {
+                    get_from_azure = true;
+                } else if let Some(awi) = state.azure_item_cache.get(&item_info.id) {
+                    if awi.last_fetched_at.elapsed() >= Duration::from_secs(60) {
+                        get_from_azure = true;
+                    }
+                }
+
+                if get_from_azure {
+                    // we are sure the org and project are filled
+                    let azure_o = state.azure_org.as_deref().unwrap_or_default().to_string();
+                    state
+                        .worker
+                        .tasks
+                        .push_back(WorkerRequest::AzureItem(azure_o, item_info.id));
+                }
             }
         }
     }

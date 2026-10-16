@@ -50,6 +50,8 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
             }
             KeyCode::Char('U') => set_input(state, InputType::Server),
             KeyCode::Char('N') => set_input(state, InputType::UserName),
+            KeyCode::Char('O') => set_input(state, InputType::AzureOrg),
+            KeyCode::Char('P') => set_input(state, InputType::AzureProject),
             // Now we check state and send key to appropriate handler
             KeyCode::Char('C') => {
                 // Only makes sense when we have a session selected
@@ -115,6 +117,21 @@ pub fn handle_key(key: KeyEvent, state: &mut AppState) {
                 state.selected_item = 0;
                 state.selected_item_info = None;
             }
+            // Scroll functions
+            KeyCode::Char('k') => {
+                if state.ui_state.scroll > 1 {
+                    state.ui_state.scroll -= 2;
+                }
+            }
+            KeyCode::Char('j') => {
+                state.ui_state.scroll += 2;
+            }
+            // Reset to top
+            KeyCode::Char('K') => {
+                state.ui_state.scroll = 0;
+            }
+
+            // User actions
             KeyCode::Char('v') => {
                 // Only vote if item NOT done
                 if let Some(item) = &state.selected_item_info {

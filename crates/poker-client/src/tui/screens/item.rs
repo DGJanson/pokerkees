@@ -18,10 +18,20 @@ pub fn draw_item_screen(frame: &mut Frame, state: &mut AppState, area: Rect) {
         lines.extend(show_item_info(item_info, state));
     } else {
         lines.push(Line::from("No Item Info available yet."));
-        lines.push(Line::default());
     }
 
-    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner_rect);
+    // If azure config enabled
+    // check for azure item info
+    if state.azure_org.is_some() && state.azure_project.is_some() {
+        lines.extend(show_azure_info(state));
+    }
+
+    frame.render_widget(
+        Paragraph::new(lines)
+            .wrap(Wrap { trim: false })
+            .scroll((state.ui_state.scroll, 0)),
+        inner_rect,
+    );
 }
 
 fn get_header_lines(state: &AppState) -> Vec<Line> {
@@ -106,6 +116,40 @@ fn show_item_info<'a>(item: &'a PokerItem, state: &'a AppState) -> Vec<Line<'a>>
                 lines.push(Line::from(format!("{name:<20}  -")));
             }
         }
+    }
+
+    lines
+}
+
+fn show_azure_info(state: &AppState) -> Vec<Line> {
+    let mut lines = Vec::new();
+    lines.push(Line::default());
+    if !state.azure_item_cache.contains_key(&state.selected_item) {
+        lines.push(Line::from("No Azure info available").style(Style::default().fg(Color::Yellow)));
+    } else if let Some(awi) = state.azure_item_cache.get(&state.selected_item) {
+        lines.push(Line::from("Azure Devops info").style(Style::default().fg(Color::Green)));
+        lines.push(Line::default());
+        lines.push(Line::from("Title:").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(awi.title.as_str()));
+        lines.push(Line::from("State:").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(awi.state.as_str()));
+        lines.push(Line::from("Assigned to:").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(
+            awi.assigned_to.as_deref().unwrap_or("Unassigned"),
+        ));
+        lines.push(Line::from("Tags:").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(awi.tags.join(", ")));
+        lines.push(Line::from("Created:").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(awi.created_date.as_str()));
+        lines.push(Line::from("Description:").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(awi.description.as_str()));
+        lines.push(Line::from("Acceptance Criteria:").style(Style::default().fg(Color::Yellow)));
+        lines.push(Line::from(awi.acceptance_criteria.as_str()));
+    } else {
+        lines.push(
+            Line::from("Could not find or render Azure info")
+                .style(Style::default().fg(Color::Red)),
+        );
     }
 
     lines

@@ -25,6 +25,16 @@ pub fn set_input(state: &mut AppState, input_type: InputType) {
         InputType::UserName => {
             state.ui_state.input_value = state.user_name.clone();
         }
+        InputType::AzureOrg => {
+            // We prefill the default url if nothing set
+            state.ui_state.input_value = state
+                .azure_org
+                .clone()
+                .unwrap_or("https://dev.azure.com/".to_string());
+        }
+        InputType::AzureProject => {
+            state.ui_state.input_value = state.azure_project.clone().unwrap_or_default();
+        }
         InputType::NewSession => {
             state.ui_state.input_value = String::new();
         }
@@ -81,6 +91,27 @@ pub fn handle_confirm_input(state: &mut AppState) {
             }
             state.user_name = state.ui_state.input_value.clone();
             // Reset screen state
+            reset_input(state);
+        }
+        InputType::AzureOrg => {
+            // The url is prefilled when creating input
+            // So we can simply set the value and reset
+            if state.ui_state.input_value.is_empty() {
+                state.azure_org = None;
+            } else {
+                state.azure_org = Some(state.ui_state.input_value.clone());
+            }
+
+            reset_input(state);
+        }
+        InputType::AzureProject => {
+            // No checks, simply set
+            if state.ui_state.input_value.is_empty() {
+                state.azure_project = None;
+            } else {
+                state.azure_project = Some(state.ui_state.input_value.clone());
+            }
+
             reset_input(state);
         }
         InputType::NewSession => {

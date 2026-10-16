@@ -6,11 +6,14 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
+use handlers::azure::fetch_azure_item;
 use handlers::items::{parse_get_item_info, parse_get_items};
-use handlers::sessions::parse_get_sessions;
+use handlers::sessions::{self, parse_get_sessions};
 use poker_shared::{ItemInfo, PokerItem};
 use reqwest::blocking::Client;
 use url::Url;
+
+use crate::state::AzureWorkItem;
 
 mod handlers;
 
@@ -32,6 +35,9 @@ pub enum WorkerRequest {
     RevealItem(Url, String, usize),
     FinishItem(Url, String, usize),
     VoteForItem(Url, String, usize, String, usize),
+
+    // Azure stuff
+    AzureItem(String, usize),
 }
 
 // Worker -> UI
@@ -50,11 +56,14 @@ pub enum WorkerEvent {
     // Detailed info of a single item
     ItemInfo { item: PokerItem },
     // Item created
-    CreatedItem { item_id: usize },
+    CreatedItem {},
     // Successful reveal/finish/vote acks
     ItemRevealed,
     ItemFinished,
     ItemVoted,
+
+    // Azure
+    AzureItem(AzureWorkItem),
 
     // In case of any error, simply return
     Error(String),
@@ -146,6 +155,9 @@ fn handle_request(request: WorkerRequest, client: &Client) -> WorkerEvent {
         WorkerRequest::VoteForItem(url, session, item_id, user, vote) => {
             vote_for_item(url, session.as_str(), item_id, user.as_str(), vote, client)
         }
+
+        // Azure stuff
+        WorkerRequest::AzureItem(org, item_id) => get_azure_cli_info(org, item_id),
     }
 }
 
@@ -353,7 +365,7 @@ fn create_item(
         Ok(resp) => {
             let status = resp.status();
             if status.is_success() {
-                WorkerEvent::CreatedItem { item_id }
+                WorkerEvent::CreatedItem {}
             } else {
                 let msg = if status == reqwest::StatusCode::NOT_FOUND {
                     format!("Error creating item. Session '{session}' not found")
@@ -525,5 +537,13 @@ fn vote_for_item(
         Err(_) => WorkerEvent::Error(String::from(
             "Error voting for item. Could not reach server",
         )),
+    }
+}
+
+// Azure items
+fn get_azure_cli_info(org: String, item_id: usize) -> WorkerEvent {
+    match fetch_azure_item(&org, item_id) {
+        Ok(awi) => WorkerEvent::AzureItem(awi),
+        Err(e) => WorkerEvent::Error(e),
     }
 }

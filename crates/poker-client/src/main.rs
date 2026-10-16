@@ -18,6 +18,14 @@ struct Cli {
     #[arg(short, long, default_value_t = String::new())]
     #[arg(help = "The name to use for your Pokerkees user")]
     name: String,
+
+    #[arg(short='o', long, default_value_t = String::new())]
+    #[arg(help = "The org name you use in devops")]
+    azure_organisation: String,
+
+    #[arg(short='p', long, default_value_t = String::new())]
+    #[arg(help = "The project name you use in devops within the org")]
+    azure_project: String,
 }
 
 fn main() {
@@ -46,9 +54,27 @@ fn main() {
         }
     }
 
+    let mut azure_org: Option<String> = None;
+    if !cli.azure_organisation.is_empty() {
+        // Check somewhat sloppily if we have
+        // a full url or not
+        if !cli.azure_organisation.starts_with("https:") {
+            // If not full url, append to standard url
+            azure_org = Some(format!("https://dev.azure.com/{}", cli.azure_organisation));
+        } else {
+            azure_org = Some(cli.azure_organisation);
+        }
+    }
+
+    let mut azure_proj: Option<String> = None;
+    if !cli.azure_project.is_empty() {
+        // No checks, just set
+        azure_proj = Some(cli.azure_project);
+    }
+
     let (s, r, handle) = spawn_worker();
 
-    let state = state::init_state(name, url, s, r);
+    let state = state::init_state(name, url, s, r, azure_org, azure_proj);
 
     let tui_exit = start_tui(state);
 

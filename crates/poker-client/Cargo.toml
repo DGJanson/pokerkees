@@ -16,3 +16,5 @@ ratatui = {version = "0.30"}
 crossterm = {version = "0.29"}
 clap = {version = "4.6", features = ["derive"]}
 url = { version = "2.5" }
+encoding_rs = { version = "0.8" }
+html2text = { version = "0.17" }
